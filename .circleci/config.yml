@@ -16,8 +16,21 @@ jobs:
           docker_layer_caching: false
       - run: make test
 
+  build:
+    executor: main
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run: make bin/safelock
+      - run: bin/safelock --help
+
 workflows:
   version: 2
   main:
     jobs:
       - test
+
+      - build:
+          requires:
+            - test
