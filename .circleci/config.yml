@@ -23,6 +23,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: false
       - run: make bin/safelock
+      - run: bin/safelock --help
 
 workflows:
   version: 2
