@@ -29,6 +29,7 @@ type SafeLockiface interface {
 	Lock() error
 	Unlock() error
 	GetID() string
+	SetID(string) error
 	GetLockState() (LockState, error)
 	GetLockURI() string
 	GetLockSuffix() string
@@ -78,6 +79,16 @@ func (l *SafeLock) Unlock() error {
 // GetID returns the string representation of the lock's UUID
 func (l *SafeLock) GetID() string {
 	return l.id.String()
+}
+
+// SetID sets the lock's UUID
+func (l *SafeLock) SetID(lockID string) error {
+	u, errParse := uuid.Parse(lockID)
+	if errParse != nil {
+		return errParse
+	}
+	l.id = u
+	return nil
 }
 
 // GetLockState returns the lock's state

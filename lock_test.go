@@ -43,4 +43,11 @@ func TestSafeLock(t *testing.T) {
 	// Wait
 	errWaitForLock := l.WaitForLock()
 	assert.NoError(t, errWaitForLock)
+
+	// SetID
+	errSetID := l.SetID(uuid.New().String())
+	assert.NoError(t, errSetID)
+
+	errSetID = l.SetID("baduuid")
+	assert.Error(t, errSetID)
 }
