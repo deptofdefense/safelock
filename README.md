@@ -42,6 +42,21 @@ SafeLock also provides a primitive to build your own lock named `SafeLock`.
 
 Testing can be done using the `Makefile` targets `make test` and `make test_coverage`.
 
+## Development
+
+Development for this has been geared towards MacOS users. Install dependencies to get started:
+
+```sh
+brew install circleci go golangci-lint pre-commit shellcheck
+```
+
+Install the pre-commit hooks and run them before making pull requests:
+
+```sh
+pre-commit install
+pre-commit run -a
+```
+
 ## License
 
 This project constitutes a work of the United States Government and is not subject to domestic copyright protection under 17 USC § 105.  However, because the project utilizes code licensed from contributors and other third parties, it therefore is licensed under the MIT License.  See LICENSE file for more information.
