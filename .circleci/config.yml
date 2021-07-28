@@ -1,0 +1,23 @@
+version: '2.1'
+
+executors:
+  main:
+    docker:
+      - image: cimg/go:1.16
+
+jobs:
+
+  # `test` tests the source code.
+  test:
+    executor: main
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run: make test
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - test
