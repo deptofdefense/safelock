@@ -67,7 +67,6 @@ func (l *FileLock) Unlock() error {
 	// Check first if the lock exists
 	// For FileLock the error is never used and the state can only be locked/unlocked
 	lockState, _ := l.GetLockState()
-	fmt.Println(l.GetFilename(), l.GetLockFilename(), lockState)
 	if lockState == LockStateUnlocked {
 		return fmt.Errorf("the object at %s is not locked", l.GetFilename())
 	}
