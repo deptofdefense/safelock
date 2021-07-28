@@ -7,7 +7,7 @@ ROOT = $(shell pwd)
 BINDIR = $(ROOT)/bin
 
 GIT_COMMIT ?= $(shell git rev-list -1 HEAD)
-COMMON_LDFLAGS=-s -w -X
+COMMON_LDFLAGS=-s -w
 ifdef CIRCLECI
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
@@ -19,7 +19,10 @@ endif
 help: ## Print the help documentation
 	@grep -E '^[\/a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-# ----- Other Targets -----
+# ----- Targets -----
+
+bin/safelock: ## Build the safelock cli tool
+	GOARCH=amd64 $(CC) build -ldflags "$(LDFLAGS) $(COMMON_LDFLAGS)" -o $@ $(GOPKG)/cmd/$(notdir $@)
 
 .PHONY: tidy
 tidy: ## Run go mod tidy
