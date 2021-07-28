@@ -42,6 +42,16 @@ func main() {
 		Short:                 "SafeLock is a golang package for locking files used by distributed services",
 	}
 
+	fileLockCommand := &cobra.Command{
+		Use:                   `file [flags]`,
+		DisableFlagsInUseLine: true,
+		Short:                 "Use SafeLock on a local file",
+		SilenceErrors:         true,
+		SilenceUsage:          true,
+		RunE:                  fileLockCmd,
+	}
+	initFileLockFlags(fileLockCommand.Flags())
+
 	s3ObjectLockCommand := &cobra.Command{
 		Use:                   `s3object [flags]`,
 		DisableFlagsInUseLine: true,
@@ -53,6 +63,7 @@ func main() {
 	initS3ObjectLockFlags(s3ObjectLockCommand.Flags())
 
 	rootCommand.AddCommand(
+		fileLockCommand,
 		s3ObjectLockCommand,
 	)
 
