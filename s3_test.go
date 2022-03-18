@@ -10,7 +10,7 @@ import (
 	"testing/iotest"
 	"time"
 
-	"github.com/gage-technologies/safelock/internal/mocks"
+	"github.com/deptofdefense/safelock/internal/mocks"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"

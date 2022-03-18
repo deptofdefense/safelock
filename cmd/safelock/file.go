@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/gage-technologies/safelock"
+	"github.com/deptofdefense/safelock"
 
 	"github.com/google/uuid"
 	"github.com/spf13/afero"
