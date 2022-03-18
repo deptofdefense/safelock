@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
-	"github.com/deptofdefense/safelock"
+	"github.com/gage-technologies/safelock"
 
 	"github.com/google/uuid"
 	"github.com/spf13/afero"
@@ -18,12 +20,14 @@ const (
 	flagFileLockFilename = "filename"
 	flagFileLockAction   = "action"
 	flagFileLockID       = "lock-id"
+	flagFileLockNode     = "node"
 )
 
 func initFileLockFlags(flag *pflag.FlagSet) {
 	flag.String(flagFileLockFilename, "", "The filename")
 	flag.String(flagFileLockAction, actionLock, "The action to use")
-	flag.String(flagFileLockID, "", "The id of the lock to act upon")
+	flag.Uint64(flagFileLockID, uint64(time.Now().UnixNano()), "The id of the lock to act upon")
+	flag.Uint(flagFileLockNode, math.MaxInt, "The node of the lock to act upon")
 }
 
 func checkFileLockConfig(v *viper.Viper) error {
@@ -68,12 +72,17 @@ func fileLockCmd(cmd *cobra.Command, args []string) error {
 	filename := v.GetString(flagFileLockFilename)
 	action := v.GetString(flagFileLockAction)
 
+	node := v.GetUint(flagFileLockNode)
+
 	fs := afero.NewOsFs()
-	l := safelock.NewFileLock(filename, fs)
+	l := safelock.NewFileLock(uint16(node), filename, fs)
+
+	lockID := v.GetUint64(flagFileLockID)
+	l.SetID(lockID)
 
 	switch action {
 	case actionLock:
-		errWaitForLock := l.WaitForLock()
+		errWaitForLock := l.WaitForLock(safelock.DefaultTimeout)
 		if errWaitForLock != nil {
 			return errWaitForLock
 		}
@@ -81,13 +90,7 @@ func fileLockCmd(cmd *cobra.Command, args []string) error {
 		if errLock != nil {
 			return errLock
 		}
-		fmt.Println(l.GetID())
 	case actionUnlock:
-		lockID := v.GetString(flagFileLockID)
-		errSetID := l.SetID(lockID)
-		if errSetID != nil {
-			return errSetID
-		}
 		errUnlock := l.Unlock()
 		if errUnlock != nil {
 			return errUnlock

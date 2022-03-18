@@ -3,12 +3,12 @@ package safelock
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -31,9 +31,9 @@ type S3ObjectLock struct {
 }
 
 // NewS3ObjectLock creates a new instance of S3ObjectLock
-func NewS3ObjectLock(s3bucket, s3key, s3KMSKeyArn string, svcS3 LockS3Client) *S3ObjectLock {
+func NewS3ObjectLock(node uint16, s3bucket, s3key, s3KMSKeyArn string, svcS3 LockS3Client) *S3ObjectLock {
 	return &S3ObjectLock{
-		SafeLock:    NewSafeLock(),
+		SafeLock:    NewSafeLock(node),
 		s3Bucket:    s3bucket,
 		s3Key:       s3key,
 		s3KMSKeyArn: s3KMSKeyArn,
@@ -48,7 +48,30 @@ func (l *S3ObjectLock) Lock() error {
 	// For S3ObjectLock the error is never used and the state can only be locked/unlocked
 	lockState, _ := l.GetLockState()
 	if lockState == LockStateLocked {
-		return fmt.Errorf("the object at %s is locked", l.GetObjectURI())
+		// conditionally handle deadlock if the lock exists and is owned by a prior session of the same node
+
+		// check the ownership of the lock
+		ownedNode, ownedSession, expired, err := l.lockStatus()
+		if err != nil {
+			return fmt.Errorf("failed to check lock ownership: %v", err)
+		}
+
+		// release a deadlocked file lock
+		if (ownedNode && !ownedSession) || expired {
+			l.mu.Lock()
+			// remove file system lock
+			_, err := l.svcS3.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+				Bucket: &l.s3Bucket,
+				Key:    aws.String(l.GetLockPath()),
+			})
+			if err != nil {
+				l.mu.Unlock()
+				return err
+			}
+			l.mu.Unlock()
+		} else {
+			return fmt.Errorf("the object at %s is locked", l.GetObjectURI())
+		}
 	}
 
 	// Lock after getting the lock state
@@ -56,7 +79,7 @@ func (l *S3ObjectLock) Lock() error {
 	defer l.mu.Unlock()
 
 	// Write object to S3
-	body := []byte(l.GetID())
+	body := l.GetLockBody()
 	_, errPutObject := l.svcS3.PutObject(context.TODO(), &s3.PutObjectInput{
 		ACL:                  types.ObjectCannedACLPrivate,
 		Bucket:               &l.s3Bucket,
@@ -83,13 +106,38 @@ func (l *S3ObjectLock) Unlock() error {
 	}
 
 	// Validate that the lock belongs to this code
-	sameLock, errIsSameLock := l.isSameLock()
+	ownedNode, _, expired, errIsSameLock := l.lockStatus()
 	if errIsSameLock != nil {
 		return fmt.Errorf("unable to determine if lock is the same lock: %w", errIsSameLock)
 	}
 
-	if !sameLock {
+	if !ownedNode && !expired {
 		return fmt.Errorf("the existing lock is not managed by this process")
+	}
+
+	// Lock after verifying the state and lock contents
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Remove object from S3
+	_, errDeleteObject := l.svcS3.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: &l.s3Bucket,
+		Key:    aws.String(l.GetLockPath()),
+	})
+	if errDeleteObject != nil {
+		return errDeleteObject
+	}
+	return nil
+}
+
+// ForceUnlock will unlock despite ownership
+func (l *S3ObjectLock) ForceUnlock() error {
+
+	// Check first if the lock exists
+	// For S3ObjectLock the error is never used and the state can only be locked/unlocked
+	lockState, _ := l.GetLockState()
+	if lockState == LockStateUnlocked {
+		return fmt.Errorf("the object at %s is not locked", l.GetObjectURI())
 	}
 
 	// Lock after verifying the state and lock contents
@@ -165,8 +213,12 @@ func (l *S3ObjectLock) GetLockState() (LockState, error) {
 	return LockStateLocked, nil
 }
 
-// isSameLock will determine if the current lock belongs to this lock
-func (l *S3ObjectLock) isSameLock() (bool, error) {
+// lockStatus load the current state of the lock
+// Returns
+// 		nodeOwned 			- bool, whether the lock is owned by this node
+//		sessionOwned 		- bool, whether the lock is owned byt his session
+//		expired 			- bool, whether the lock has passed its expiration
+func (l *S3ObjectLock) lockStatus() (bool, bool, bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -175,28 +227,49 @@ func (l *S3ObjectLock) isSameLock() (bool, error) {
 		Key:    aws.String(l.GetLockPath()),
 	})
 	if errGetObject != nil {
-		return false, errGetObject
+		return false, false, false, errGetObject
 	}
 	body, errRead := ioutil.ReadAll(getObjectOutput.Body)
 	if errRead != nil {
-		return false, errRead
+		return false, false, false, errRead
 	}
 
-	// If the contents of the lock and the ID are the same then it is locked
-	// Check that the strings are the same using a case-insensitive test
-	if strings.EqualFold(string(body), l.GetID()) {
-		return true, nil
+	// split the body into the node and id
+	parts := bytes.Split(body, []byte("\n"))
+	if len(parts) != 3 {
+		return false, false, false, fmt.Errorf("incompatible lock file format")
 	}
-	return false, nil
+
+	// set the default value for expiration to false
+	expired := false
+
+	// handle timestamp if there is a configured timeout on the lock
+	if l.timeout > 0 {
+		// decode the timestamp from the third position in the lock file
+		ts := time.Unix(0, int64(binary.LittleEndian.Uint64(parts[2])))
+
+		// update expired with the expiration status
+		expired = time.Since(ts) > l.timeout
+	}
+
+	return bytes.Equal(parts[0], l.GetNodeBytes()), bytes.Equal(parts[1], l.GetIDBytes()), expired, nil
 }
 
 // WaitForLock waits until an object is no longer locked or cancels based on a timeout
-func (l *S3ObjectLock) WaitForLock() error {
+func (l *S3ObjectLock) WaitForLock(timeout time.Duration) error {
 	// Do not lock/unlock the struct here or it will block getting the lock state
 
-	// Pass a context with a timeout to tell a blocking function that it
-	// should abandon its work after the timeout elapses.
-	ctx, cancel := context.WithTimeout(context.Background(), l.GetTimeout())
+	// create variable to hold the context
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	// conditionally configure the context with a timeout
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+
 	defer cancel()
 
 	for {

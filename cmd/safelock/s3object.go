@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
-	"github.com/deptofdefense/safelock"
+	"github.com/gage-technologies/safelock"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -22,6 +24,7 @@ const (
 	flagS3ObjectLockKMSKeyArn = "s3-kms-key-arn"
 	flagS3ObjectLockAction    = "action"
 	flagS3ObjectLockID        = "lock-id"
+	flagS3ObjectLockNode      = "node"
 
 	actionLock   = "lock"
 	actionUnlock = "unlock"
@@ -37,7 +40,8 @@ func initS3ObjectLockFlags(flag *pflag.FlagSet) {
 	flag.String(flagS3ObjectLockKey, "", "The s3 key")
 	flag.String(flagS3ObjectLockKMSKeyArn, "", "The s3 kms key ARN")
 	flag.String(flagS3ObjectLockAction, actionLock, "The action to use")
-	flag.String(flagS3ObjectLockID, "", "The id of the lock to act upon")
+	flag.Uint64(flagS3ObjectLockID, uint64(time.Now().UnixNano()), "The id of the lock to act upon")
+	flag.Uint(flagS3ObjectLockNode, math.MaxInt, "The node of the lock to act upon")
 }
 
 func checkS3ObjectLockConfig(v *viper.Viper) error {
@@ -105,11 +109,17 @@ func s3ObjectLockCmd(cmd *cobra.Command, args []string) error {
 		return errCfg
 	}
 	svcS3 := s3.NewFromConfig(awsCfg)
-	l := safelock.NewS3ObjectLock(bucket, key, kmsKeyArn, svcS3)
+
+	node := v.GetUint(flagS3ObjectLockNode)
+
+	l := safelock.NewS3ObjectLock(uint16(node), bucket, key, kmsKeyArn, svcS3)
+
+	lockID := v.GetUint64(flagS3ObjectLockID)
+	l.SetID(lockID)
 
 	switch action {
 	case actionLock:
-		errWaitForLock := l.WaitForLock()
+		errWaitForLock := l.WaitForLock(safelock.DefaultTimeout)
 		if errWaitForLock != nil {
 			return errWaitForLock
 		}
@@ -119,11 +129,6 @@ func s3ObjectLockCmd(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println(l.GetID())
 	case actionUnlock:
-		lockID := v.GetString(flagS3ObjectLockID)
-		errSetID := l.SetID(lockID)
-		if errSetID != nil {
-			return errSetID
-		}
 		errUnlock := l.Unlock()
 		if errUnlock != nil {
 			return errUnlock

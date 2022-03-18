@@ -1,5 +1,5 @@
 
-GOPKG = github.com/deptofdefense/safelock
+GOPKG = github.com/gage-technologies/safelock
 CC = go
 GOOS = linux
 
