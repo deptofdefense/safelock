@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSafeLock(t *testing.T) {
 
-	l := NewSafeLock()
+	l := NewSafeLock(0)
 
 	// These have no affect but here for code coverage
 	errLock := l.Lock()
@@ -18,8 +17,8 @@ func TestSafeLock(t *testing.T) {
 	errUnlock := l.Unlock()
 	assert.NoError(t, errUnlock)
 
-	_, errParse := uuid.Parse(l.GetID())
-	assert.NoError(t, errParse)
+	nodeCreation := time.Unix(0, int64(l.GetID()))
+	assert.True(t, time.Since(nodeCreation) < time.Second)
 
 	lockState, errGetLockState := l.GetLockState()
 	assert.NoError(t, errGetLockState)
@@ -41,13 +40,10 @@ func TestSafeLock(t *testing.T) {
 	assert.Equal(t, newTimeout, l.GetTimeout())
 
 	// Wait
-	errWaitForLock := l.WaitForLock()
+	errWaitForLock := l.WaitForLock(DefaultTimeout)
 	assert.NoError(t, errWaitForLock)
 
 	// SetID
-	errSetID := l.SetID(uuid.New().String())
-	assert.NoError(t, errSetID)
-
-	errSetID = l.SetID("baduuid")
-	assert.Error(t, errSetID)
+	l.SetID(37583)
+	assert.Equal(t, l.GetID(), uint64(37583))
 }
