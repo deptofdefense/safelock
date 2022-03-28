@@ -2,5 +2,3 @@ bin/
 
 # test coverage
 coverage.out
-
-.idea
