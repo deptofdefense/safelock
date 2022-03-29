@@ -35,8 +35,8 @@ func TestS3ObjectLock(t *testing.T) {
 	data, errReadAll := ioutil.ReadAll(svcS3.PutObjectInput.Body)
 	assert.NoError(t, errReadAll)
 	assert.True(t, bytes.Equal(
-		bytes.Join(bytes.Split(l.GetLockBody(), []byte("\n"))[:2], []byte("\n")),
-		bytes.Join(bytes.Split(data, []byte("\n"))[:2], []byte("\n")),
+		bytes.Join(bytes.Split(l.GetLockBody(), []byte("__::__"))[:2], []byte("__::__")),
+		bytes.Join(bytes.Split(data, []byte("__::__"))[:2], []byte("__::__")),
 	))
 
 	// Indicate that the file exists
