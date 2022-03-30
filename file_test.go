@@ -33,8 +33,8 @@ func TestFileLock(t *testing.T) {
 	data, errReadAll := ioutil.ReadAll(aFile)
 	assert.NoError(t, errReadAll)
 	assert.True(t, bytes.Equal(
-		bytes.Join(bytes.Split(l.GetLockBody(), []byte("\n"))[:2], []byte("\n")),
-		bytes.Join(bytes.Split(data, []byte("\n"))[:2], []byte("\n")),
+		bytes.Join(bytes.Split(l.GetLockBody(), []byte("__::__"))[:2], []byte("__::__")),
+		bytes.Join(bytes.Split(data, []byte("__::__"))[:2], []byte("__::__")),
 	))
 
 	errUnlock := l.Unlock()

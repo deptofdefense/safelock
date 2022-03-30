@@ -154,9 +154,9 @@ func (l *SafeLock) GetLockBody() []byte {
 	binary.LittleEndian.PutUint64(buf, uint64(time.Now().UnixNano()))
 
 	body := l.GetNodeBytes()
-	body = append(body, []byte("\n")...)
+	body = append(body, []byte("__::__")...)
 	body = append(body, l.GetIDBytes()...)
-	body = append(body, []byte("\n")...)
+	body = append(body, []byte("__::__")...)
 	body = append(body, buf...)
 	return body
 }

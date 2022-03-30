@@ -235,7 +235,7 @@ func (l *S3ObjectLock) lockStatus() (bool, bool, bool, error) {
 	}
 
 	// split the body into the node and id
-	parts := bytes.Split(body, []byte("\n"))
+	parts := bytes.Split(body, []byte("__::__"))
 	if len(parts) != 3 {
 		return false, false, false, fmt.Errorf("incompatible lock file format")
 	}
