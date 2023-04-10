@@ -3,7 +3,7 @@ module github.com/deptofdefense/safelock
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.15.0
+	github.com/aws/aws-sdk-go-v2 v1.17.8
 	github.com/aws/aws-sdk-go-v2/config v1.5.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.26.0
 	github.com/google/uuid v1.3.0
@@ -27,7 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.3.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.6.0 // indirect
-	github.com/aws/smithy-go v1.11.1 // indirect
+	github.com/aws/smithy-go v1.13.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
